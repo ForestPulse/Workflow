@@ -1,84 +1,102 @@
-// all names are currently placeholders and subject to change
-// all functions could even be merged into one
 
-process augment {
+process split_samples {
+    label 'tree_mask'
+
     input:
-    path train
+    path('2_FORCE_samples/*') //to stage files conveniently
 
     output:
-    path "train_augmented.npy"
+    path "3_train_test_data/"
+    
+    script:
+    """
+    3_split_to_2D_array.py --working_directory .
+    """
+}
+
+process augment {
+    label 'tree_mask'
+    
+    input:
+    path train_test_data
+
+    output:
+    tuple path(train_test_data), path("4_augmented_data/")
 
     script:
     """
-    python augment.py ${train}
+    4_data_augmentation.py --working_directory .
     """
 }
 
 process aggregate_weekly {
+    label 'tree_mask'
+    
     input:
-    path file
+    tuple path(train_test_data), path(augmented)
 
     output:
-    path "${file}_aggregated.npy"
+    tuple path(train_test_data), path(augmented), path("5_folded_data/")
 
     script:
     """
-    python aggregate_weekly.py ${file}
+    5_weekly_folding.py --working_directory .
     """
 }
 
 process train {
+    label 'tree_mask'
+    
     input:
-    path train_aggregated
+    tuple path(train_test_data), path(augmented), path(folded)
 
     output:
-    path "model.keras"
+    tuple path(train_test_data), path(augmented), path(folded), path("6_trained_model/")
 
     script:
     """
-    python train.py ${train_aggregated}
+    6_train_CNN.py --working_directory .
+    """
+}
+
+process validation {
+    label 'tree_mask'
+    
+    input:
+    path(train_test_data), path(augmented), path(folded), path(models)
+
+    publishDir "${params.publish}/${params.project}",
+        mode: 'copy', overwrite: true, failOnError: true
+    
+    output:
+    path "7_validation/confusion_matrix_report.txt"
+
+    script:
+    """
+    7_validation.py --working_directory .
     """
 }
 
 process predict {
+    label 'tree_mask'
+    label 'multithread'
+    maxForks 2
+
     input:
-    path tile
-    path model
+    tuple path(datacube), val(tile), path(models) // models for staging purposes
+
+    publishDir "${params.publish}/${params.project}",
+        mode: 'copy', overwrite: true, failOnError: true
 
     output:
-    path "${tile}_predicted.tif"
+    tuple val(tile), path("8_prediction/${tile}/")
 
     script:
     """
-    python predict.py ${tile} ${model}
-    """
-}
-
-process binarize {
-    input:
-    path tile
-
-    //TODO: more sensible naming convention
-    output:
-    path "${tile}_binarized"
-
-    script:
-    """
-    python binarize.py ${tile}
-    """
-}
-
-process binary_tile_max{
-    input:
-    path legal_forest_mask
-    path old_mask
-    path predicted
-
-    output:
-    path "predicted.tif"
-
-    script:
-    """
-    python tileMax.py ${legal_forest_mask} ${old_mask} ${predicted}
+    9_DC_predict.py --working_directory . \
+        --year ${params.forestMask.year} \
+        --tile ${tile} \
+        --name_list "${params.forestMask.name_list}" \
+        --version 3
     """
 }

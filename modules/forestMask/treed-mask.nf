@@ -1,10 +1,17 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
+include { force_get_tiles; force_analysis_masks } from '../common/force.nf'
+
+include { fold_TSA_labels } from './fold-TSA-labels.nf'
+include { obtain_samples } from './obtain-samples.nf'
+include { split_samples; augment; aggregate_weekly; train; predict; validation } from './model.nf'
+include { fold_TSA_aoi } from './fold-TSA-aoi.nf'
+
 /*
-to do: how to automate nextflow with future web app parameters
-performance tests for pixel-wise operations
-validations via "project name" like Hungry-Beetle
+    Nextflow adaptation of https://github.com/ForestPulse/tree-mask
+    using ghcr.io/forestpulse/tree-mask:latest, with its required libraries and
+    already containing a copy of said repository
 */
 
 workflow {
@@ -12,91 +19,160 @@ workflow {
 }
 
 workflow treed_mask {
+
+    main:
+    labels = Channel.fromPath(params.forestMask.labels)
+    aoi = Channel.fromPath(params.aoi)
+    datacube = Channel.fromPath(params.datacube)
+    datacube_definition = Channel.fromPath( params.datacube + '/datacube-definition.prj' )
+
+    // Evaluate if mask needs conversion to tiles
+    if (params.forestMask.labels_is_vector) {
+        labels_mask = make_processing_mask("training_point_mask", labels, datacube_definition)
+    } else {
+        labels_mask = labels
+    }
+
+    tiles = force_get_tiles(aoi, datacube_definition)
     
-    load_treed() //TODO
-/*
-    "labels.gpkg"
-    "legal.forest.gpkg"
-    "aoi.gpkg"
-    "old-mask.gpkg" //if exists, is already in a digestible format
-    "datacube_definition.prj"
-*/
-
-    //assuming Geopackages on both cases
-    labels_mask = make_processing_mask("labels", load_treed.out.labels, params.datacube_definition)
-    legal_forest_mask = make_processing_mask("legal-forest", load_treed.out.legal_forest, params.datacube_definition)
-
-    //AOI tiles
-    tiles = force_get_tiles(
-        load_treed.out.aoi, 
-        load_treed.out.datacube_definition
-    )
-
-    // generate samples and split them in train and test
-    samples = load.out.datacube
+    // note: samples does not return a data cube nor tiles, but .txt files
+    samples = datacube
         | combine(labels_mask)
         | combine(tiles)
         | fold_TSA_labels
-        | obtain_samples //has an internal conversion to fit force_higher_level
-        | collect
-        | export_csv
-        //TODO test if parameter is being sent correctly, else combine
-        | split_samples(ratio: 0.7)
+        | obtain_samples
+    
+    // Renaming the output files in `obtain_samples` saves so much trouble
+    files = samples.multiMap{
+        dir, mask, tile, x, y, _ ->
+            coord:       file("${dir}/*coord.txt")
+            sample:      file("${dir}/*sample.txt")
+            response:    file("${dir}/*response.txt")
+    }
 
-    // train model. returns model path (assuming a single one)
-    model = samples.train
+    coord_ch    = files.coord.collect().map { files -> tuple('coord', files) }
+    sample_ch   = files.sample.collect().map { files -> tuple('sample', files) }
+    response_ch = files.response.collect().map { files -> tuple('response', files) }
+    
+    // Nextflow will not handle running the same task with different parameters explicitly
+    all_files = (coord_ch.concat(sample_ch).concat(response_ch)) | concatenateFiles
+
+    // Returns a convenient tuple of paths (3_split, 4_augmented, 5_fold, 6_models)
+    models = all_files
+        | collect
+        | split_samples
         | augment
         | aggregate_weekly
         | train
 
-    // for future use
-    validations = samples.test | aggregate_weekly
+    //TODO: Validation publication
+    // models | validation    
 
-    // perform predictions on weekly aggregates for AOI
-    predictions = load_treed.out.datacube
-        | combine(tiles) //assuming no mask here
+    // Assuming legal_mask is already cubed, else:
+    //legal_mask_cube = make_processing_mask("legal_forest_mask", legal_mask, datacube_definition)
+    ch_legal = Channel.fromPath("${params.forestMask.legal_mask}/*/legal_forest_mask.tif")
+        | map { path -> tuple(path.parent.name, path) }
+
+    // AOI is sampled using the area of Germany as mask (most general case)
+    de_mask = Channel.fromPath(params.forestMask.de_mask)
+    fold_aoi = datacube
+        | combine(de_mask)
+        | combine(tiles)
         | fold_TSA_aoi
-        | map(it[0]) //we only need the .tif routes
-        | combine(model)
-        | predict //gets fed a tuple (.tif, model)
-        | binarize
 
-    // merge results with already existing masks. returns a location
-    final_mask = binary_tile_max(legal_forest_mask, old_mask, predictions) //TODO
+    //every tile is a datacube, thus the methods can be used directly
+    //what happens if we have mask, but no tile? fails on previous combine, it should
+    model_directory = models.map{it[-1]}
+    prediction = fold_aoi.map{tuple(it[0], it[2])}
+        | combine(model_directory)
+        | predict
+        | view
+
+    if (!params.forestMask.use_prev_year) {
+        ch_proc = Channel.empty() //no mask
+    } else {
+        ch_proc = Channel.fromPath("${params.forestMask.processing_mask_dir}/*/processing_mask_${params.forestMask.year - 1}.tif")
+        .map { path -> tuple(path.parent.name, path) }
+    }
+
+    final_mask = prediction
+    | combine(ch_legal, by:0)
+    | join(ch_proc, remainder:true) // if there's no previous year processing mask
+    | merge_masks
 
     emit:
     final_mask
+
 }
 
-// there is an argument to move these two to obtain-samples.nf
-process export_csv {
+process merge_masks {
+    label 'tree_mask'
+    label 'multithread'
+    maxForks 2
+
     input:
-    val values
+    tuple val(id), path(prediction), path(legal), val(prev_year)
+
+    publishDir "${params.forestMask.processing_mask_dir}", mode: 'copy'
 
     output:
-    path "samples.csv"
+    tuple val(id), path("${id}/processing_mask_${params.forestMask.year}.tif")
+
+    script:
+    if( !prev_year ) {
+        """
+        mkdir -p "${id}"
+        gdal_calc.py \
+            -A $prediction/LC_forest_${params.forestMask.year}.tif \
+            -B $legal \
+            --outfile="${id}/processing_mask_${params.forestMask.year}.tif" \
+            --calc="A*(A>=B) + B*(B>A)"
+        """
+    }
+    else {
+        """
+        mkdir -p "${id}"
+        gdal_calc.py \
+            -A $prediction/LC_forest_${params.forestMask.year}.tif \
+            -B $legal \
+            -C $prev_year \
+            --outfile="${id}/processing_mask_${params.forestMask.year}.tif" \
+            --calc="A*(A>=B)*(A>=C) + B*((B>A)*(B>=C)) + C*((C>A)*(C>B))"
+        """
+    }
+}
+
+// TODO: generalization of force/force_analysis_masks
+process make_processing_mask{
+    label 'force'
+
+    input:
+    val tag
+    path origin
+    path datacube_definition
+
+    output:
+    path "${tag}"
+
+    """
+    mkdir "${tag}"
+    cp "${datacube_definition}" -t "${tag}"
+    force-cube \
+        -o "${tag}" \
+        "${origin}"
+    """
+
+}
+
+process concatenateFiles {
+    input:
+    tuple val(name), path(files)
+
+    output:
+    path("${name}.txt")
 
     script:
     """
-    {
-      echo "value"
-      printf "%s\\n" "${values[@]}"
-    } > samples.csv
-    """
-}
-
-process split_samples {
-    input:
-    path input_csv
-    val ratio
-
-    output:
-    path "train.npy" into train
-    path "test.npy" into test
-
-    script:
-    //split data to be implemented
-    """
-    split_data.py $input_csv $ratio //for example
+    cat ${files.join(' ')} > ${name}.txt
     """
 }

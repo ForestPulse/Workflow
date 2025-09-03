@@ -1,51 +1,47 @@
+include { force_parameter; force_higher_level; force_higher_level_chain } from '../common/force.nf'
+
 workflow obtain_samples {
 
   take:
   datacube_tile
-  /* 
-    previous cases used the form: 
-      tuple [path datacube, path masks, tile ID, tile ID (X), tile ID (Y)]
-    current (coming from previous higher level):
-      tuple path("${tile_ID}/*"), val(tile_ID), val(tile_X), val(tile_Y), val(product), optional: true
-  */
+
   main:
-  
-  //how are we defining the location of previous output? in parfile?
-  refined_tile = datacube_tile.map{ [it[1], it[2], it[3]] }
+  refined_tile = datacube_tile.map{ cube, mask, tile, x, y, _ -> [cube, mask, tile, x, y] }
+  //alternatively: refined_tile = datacube_tile.map{ [it[0], it[1], it[2], it[3]] }
 
-  stats = force_parameter('SMP') // create parameter file
-  | combine(load.out.datacube)
-  | combine(masks)
-  | combine(refined_tile) // add parameter file to input tuple
+  mask = force_parameter('SMP') // create parameter file
+  | combine(refined_tile)// add parameter file to input tuple
+  | combine(Channel.of('tree_mask')) //add product
   | fill_parameter_stats   // fill out the parameter file
-  | combine(Channel.of('samples'))
-  | force_higher_level     // run higher level processing
-
-/*
-  stats
-  | force_finish // compute pyramids and mosaic
-*/
+  | force_higher_level_chain     // run higher level processing
+  // note: 'Samples (SMP)' does not generate a data cube structure, just files
 
   emit:
-  stats
+  mask
   
 }
 
-//TODO: Add correct parameters and figure out naming strategy
+// fill out the paramater file
+// note: input file is copied to keep cache alive
 process fill_parameter_stats {
 
   input:
-  tuple path(parfile), path(datacube), path(maskdir), val(tile_ID), val(tile_X), val(tile_Y)
+  tuple path(parfile), path(datacube), path(maskdir), val(tile_ID), val(tile_X), val(tile_Y), val(product)
 
   output:
-  tuple path("filled_${parfile}"), path(datacube), path(maskdir), val(tile_ID), val(tile_X), val(tile_Y)
+  tuple path("filled_${parfile}"), path(datacube), path(maskdir), val(tile_ID), val(tile_X), val(tile_Y), val(product)
+
+// TODO: maybe a more sensible method for adding INPUT_FEATUREs
+/* added special name to FILE_SAMPLE, FILE_RESPONSE and FILE_COORDINATES to make
+   subsequent operations easier, as the repeated filenames can cause conflict
+*/
 
   """
   cp "$parfile" "filled_${parfile}"
-  maskfile="${params.mask.file}"
+  maskfile="${params.forestMask.labels_file}"
   sed -i "/^DIR_LOWER /c\\DIR_LOWER = ${datacube}" "filled_${parfile}"
-  sed -i "/^DIR_HIGHER /c\\DIR_HIGHER = ." "filled_${parfile}"
-  sed -i "/^DIR_PROVENANCE /c\\DIR_PROVENANCE = ." "filled_${parfile}"
+  sed -i "/^DIR_HIGHER /c\\DIR_HIGHER = ${product}" "filled_${parfile}"
+  sed -i "/^DIR_PROVENANCE /c\\DIR_PROVENANCE = ${product}" "filled_${parfile}"
   sed -i "/^DIR_MASK /c\\DIR_MASK = ${maskdir}" "filled_${parfile}"
   sed -i "/^BASE_MASK /c\\BASE_MASK = \${maskfile%.*}.tif" "filled_${parfile}"
   #sed -i "/^NTHREAD_READ /c\\NTHREAD_READ = 1" "filled_${parfile}"
@@ -53,17 +49,32 @@ process fill_parameter_stats {
   #sed -i "/^NTHREAD_WRITE /c\\NTHREAD_WRITE = 1" "filled_${parfile}"
   sed -i "/^X_TILE_RANGE /c\\X_TILE_RANGE = ${tile_X} ${tile_X}" "filled_${parfile}"
   sed -i "/^Y_TILE_RANGE /c\\Y_TILE_RANGE = ${tile_Y} ${tile_Y}" "filled_${parfile}"
-  sed -i "/^SENSORS /c\\SENSORS = ${params.sensors}" "filled_${parfile}"
-  sed -i "/^RESOLUTION /c\\RESOLUTION = ${params.resolution}" "filled_${parfile}"
-  sed -i "/^ABOVE_NOISE /c\\ABOVE_NOISE = 0" "filled_${parfile}"
-  sed -i "/^BELOW_NOISE /c\\BELOW_NOISE = 0" "filled_${parfile}"
-  sed -i "/^DATE_RANGE /c\\DATE_RANGE = ${params.reference_start}-01-01 ${params.reference_end}-12-31" "filled_${parfile}"
-  sed -i "/^DOY_RANGE /c\\DOY_RANGE = ${params.season_start} ${params.season_end}" "filled_${parfile}"
-  sed -i "/^INDEX /c\\INDEX = ${params.index}" "filled_${parfile}"
-  sed -i "/^INTERPOLATE /c\\INTERPOLATE = NONE" "filled_${parfile}"
-  sed -i "/^OUTPUT_STM /c\\OUTPUT_STM = TRUE" "filled_${parfile}"
-  sed -i "/^STM /c\\STM = STD" "filled_${parfile}"
-  sed -i "/^OUTPUT_EXPLODE /c\\OUTPUT_EXPLODE = TRUE" "filled_${parfile}"
-  """
+  sed -i "/^FEATURE_NODATA /c\\FEATURE_NODATA = 0" "filled_${parfile}"
+  sed -i "/^FILE_POINTS /c\\FILE_POINTS = ${params.forestMask.file_points}" "filled_${parfile}"
 
+  sed -i "/^FILE_SAMPLE /c\\FILE_SAMPLE = ${product}/${tile_X}_${tile_Y}_sample.txt" "filled_${parfile}"
+  sed -i "/^FILE_RESPONSE /c\\FILE_RESPONSE = ${product}/${tile_X}_${tile_Y}_response.txt" "filled_${parfile}"
+  sed -i "/^FILE_COORDINATES /c\\FILE_COORDINATES = ${product}/${tile_X}_${tile_Y}_coord.txt" "filled_${parfile}"
+  
+  sed -i "/^PROJECTED /c\\PROJECTED = TRUE" "filled_${parfile}"
+  
+  awk -v repl='${params.forestMask.input_feature}' '
+    BEGIN {
+      n = split(repl, newlines, "\\\\n")
+      inserted = 0
+    }
+    /^INPUT_FEATURE / {
+      if (!inserted) {
+        for (i = 1; i <= n; i++) {
+          line = newlines[i]
+          sub(/^[ \t]+/, "", line)
+          if (line != "") print line
+        }
+        inserted = 1
+      }
+      next
+    }
+    { print }
+  ' "filled_${parfile}" > tmp && mv tmp "filled_${parfile}"
+  """
 }
