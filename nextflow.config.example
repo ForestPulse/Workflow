@@ -1,3 +1,12 @@
+/* Sample configuration file
+-- This file provides an example on how to set up parameters for the ForestPulse
+-- project. These are the parameters used in the server hosted by CODE-DE.
+--
+-- As such, for versions hosted in other locations, it must be changed accordingly:
+-- It should be renamed `nextflow.config` and located in the base directory of
+-- the project (i.e. next to `main.nf`). `nextflow.config` has been added by
+-- default to `.gitignore` to avoid risk of overwriting configurations.
+*/
 
 includeConfig 'params/forestMask.config'
 //includeConfig 'params/treeSpecies.config'

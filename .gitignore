@@ -1,0 +1,2 @@
+# ignore configuration file, as it is server dependent
+nextflow.config
