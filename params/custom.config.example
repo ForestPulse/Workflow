@@ -1,0 +1,24 @@
+/* Custom parameter file
+-- To be edited on a per-computer basis. These parameters will oveerride others
+-- found on this folder, per declarations on nextflow.config(.example)
+-- Parameters shown here are an example.
+*/
+
+params {
+    forestMask {
+        labels          = '/data/ahsoka/eocp/forestpulse/INTERNAL/BWI4/forest_mask/training_point_mask/'
+        legal_mask      = '/data/ahsoka/eocp/forestpulse/INTERNAL/legal_forest_mask'
+        de_mask         = '/data/ahsoka/dc/deu/mask'
+        file_points     = '/data/ahsoka/eocp/forestpulse/INTERNAL/BWI4/forest_mask/forest_mask_samples_LCC.csv'
+    }
+
+/*
+    disturbances {
+
+    }
+*/
+
+    treeSpecies {
+        training_points     = "/data/ahsoka/eocp/forestpulse/INTERNAL/BWI4/2nd_sampling/3_GIS_selection/second_sampling_merge2.gpkg"
+    }
+}
