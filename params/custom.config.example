@@ -1,7 +1,8 @@
 /* Custom parameter file
--- To be edited on a per-computer basis. These parameters will oveerride others
--- found on this folder, per declarations on nextflow.config(.example)
--- Parameters shown here are an example.
+-- To be edited on a per-computer basis. These parameters will override the ones
+-- previously declared on other files as this file will get loaded afterwards
+-- on nextflow.config
+-- Parameters shown here are an example and are mostly related to file locations
 */
 
 params {
