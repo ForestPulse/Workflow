@@ -1,3 +1,7 @@
-# ignore configuration file, as it is server dependent
+# ignore configuration files, as they are server dependent
 nextflow.config
 params/custom.config
+# for cases where nextflow is executed right on this folder
+.nextflow.*
+# other helper files + project cache (not working dir cache, that is separate)
+.nextflow/
