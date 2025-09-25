@@ -113,7 +113,7 @@ process merge_masks {
     input:
     tuple val(id), path(prediction), path(legal), val(prev_year)
 
-    publishDir "${params.forestMask.processing_mask_dir}", mode: 'copy'
+    publishDir "${params.processing_mask_dir}", mode: 'copy'
 
     output:
     tuple val(id), path("${id}/processing_mask_${params.forestMask.year}.tif")
