@@ -91,7 +91,7 @@ workflow treed_mask {
     if (!params.forestMask.use_prev_year) {
         ch_proc = Channel.empty() //no mask
     } else {
-        ch_proc = Channel.fromPath("${params.forestMask.processing_mask_dir}/*/processing_mask_${params.forestMask.year - 1}.tif")
+        ch_proc = Channel.fromPath("${params.processing_mask_dir}/*/processing_mask_${params.forestMask.year - 1}.tif")
         .map { path -> tuple(path.parent.name, path) }
     }
 
@@ -108,7 +108,7 @@ workflow treed_mask {
 process merge_masks {
     label 'tree_mask'
     label 'multithread'
-    maxForks 2
+    label 'intensive'
 
     input:
     tuple val(id), path(prediction), path(legal), val(prev_year)

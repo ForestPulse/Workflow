@@ -80,7 +80,7 @@ process validation {
 process predict {
     label 'tree_mask'
     label 'multithread'
-    maxForks 2
+    label 'intensive'
 
     input:
     tuple path(datacube), val(tile), path(models) // models for staging purposes

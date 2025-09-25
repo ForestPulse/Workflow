@@ -55,7 +55,7 @@ params {
   -- Will contain all workflow output and details on workflow execution.
   -- Do not delete ``.nextflow`` directory if you want to resume workflow at a later stage. */
   //publish = '/data/ahsoka/eocp/forestpulse/01_data/02_processed_data/workflow'
-  publish= 'output/fp-nfs/ForestPulse'
+  publish= '/output/fp-nfs/ForestPulse'
 
   /* Default Mask
   -- Will contain a mask to be used when no mask has been set
@@ -91,7 +91,8 @@ process {
     container = 'ubuntu:22.04'
 
     cpus = 1
-    withLabel: 'multithread' { cpus = params.max_cpu }
+    withLabel: 'multithread'  { cpus = params.max_cpu }
+    withLabel: 'intensive'    { maxForks = 5 }
 
     withLabel: 'tree_mask'    { container = 'ghcr.io/forestpulse/tree-mask:latest'}
     withLabel: 'tree_species' { container = 'ghcr.io/forestpulse/tree-species-unmixing:latest'}
