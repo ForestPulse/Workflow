@@ -237,7 +237,7 @@ process force_higher_level_chain {
 
   label 'force'
   label 'multithread'
-  maxForks 5
+  label 'intensive'
 
   input:
   tuple path(parfile), path(datacube), path(maskdir), val(tile_ID), val(tile_X), val(tile_Y), val(product)
