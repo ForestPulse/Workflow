@@ -86,7 +86,6 @@ workflow treed_mask {
     prediction = fold_aoi.map{tuple(it[0], it[2])}
         | combine(model_directory)
         | predict
-        | view
 
     if (!params.forestMask.use_prev_year) {
         ch_proc = Channel.empty() //no mask
@@ -113,10 +112,11 @@ process merge_masks {
     input:
     tuple val(id), path(prediction), path(legal), val(prev_year)
 
-    publishDir "${params.processing_mask_dir}", mode: 'copy'
+    publishDir "${params.processing_mask_dir}", mode: 'copy', overwrite: true
 
     output:
-    tuple val(id), path("${id}/processing_mask_${params.forestMask.year}.tif")
+    tuple val(id), path("${id}/")
+    //tuple val(id), path("${id}/processing_mask_${params.forestMask.year}.tif")
 
     script:
     if( !prev_year ) {
