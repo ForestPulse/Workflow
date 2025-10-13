@@ -211,6 +211,7 @@ process force_higher_level {
 
   label 'force'
   label 'multithread'
+  label 'intensive'
 
   input:
   tuple path(parfile), path(datacube), path(maskdir), val(tile_ID), val(tile_X), val(tile_Y), val(product)
