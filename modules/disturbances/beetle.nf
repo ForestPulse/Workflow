@@ -20,7 +20,7 @@ workflow {
   //add defaults.. or demand aoi, mask and datacube values on CLI
   aoi = Channel.fromPath(params.aoi)
   datacube = Channel.fromPath(params.datacube)
-  datacube_definition = Channel.fromPath( datacube + '/datacube-definition.prj' )
+  datacube_definition = Channel.fromPath( params.datacube + '/datacube-definition.prj' )
 
   mask = Channel.fromPath(params.mask)
   if (params.disturbances.mask_is_vector) {
@@ -35,19 +35,24 @@ workflow {
 workflow beetle{
   take:
   aoi
-  mask //assume we receive a properly tiled mask already
-  datacube
+  mask //assume we receive a properly tiled mask from previous steps
 
   main:
-  datacube_definition = Channel.fromPath( datacube + '/datacube-definition.prj' )
+  datacube = Channel.fromPath( params.datacube )
+  datacube_definition = Channel.fromPath( params.datacube + '/datacube-definition.prj' )
 
   // retrieve processing extent and spatial processing units (tiles)
   tiles = force_get_tiles(aoi, datacube_definition)
-  // | view
 
-  combined_input = datacube
-    | combine(mask)
-    | combine(tiles)
+  combined_input = tiles
+    | join(mask)
+    | combine(datacube)
+    | map {id, x , y, mask, dc ->
+        tuple(dc, mask, id, x, y)
+    }
+    | view
+
+  print "this is: ${params.disturbances.mask_file}"
 
   // compute statistics (std dev.) in reference period
   stats = combined_input
@@ -60,6 +65,9 @@ workflow beetle{
     //| view
 
   // detect disturbances, and do some postprocessing-analysis
-  disturbances_monitoring_period(stats, residuals)
+  disturbances = disturbances_monitoring_period(stats, residuals)
+
+  emit:
+  disturbances
 
 }

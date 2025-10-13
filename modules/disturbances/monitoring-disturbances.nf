@@ -17,13 +17,14 @@ workflow disturbances_monitoring_period {
   ) // join input channels by [tile ID, tile ID (X), tile ID (Y)]
   | map{ [it[0], it[1], it[2], it[3], it[5], 'disturbance'] }
   | disturbance_detection // detect disturbances
+  | filter_small_disturbances // remove small objects
 
   years = disturbances
   | disturbance_year // year of disturbance
 
   disturbances
   | mix(years)
-  | force_finish // compute pyramids and mosaic
+  //| force_finish // compute pyramids and mosaic
 
   disturbances 
   | disturbance_hist // histograms of disturbance dates (for each tile)
@@ -32,9 +33,11 @@ workflow disturbances_monitoring_period {
   | disturbance_hist_merge // merge results (whole AOI)
   | disturbance_report // create report
 
+  emit:
+  years
+
 }
 
-// detect the disturbances
 process disturbance_detection {
 
   label 'beetle_core'
@@ -43,20 +46,46 @@ process disturbance_detection {
   tuple val(tile_ID), val(tile_X), val(tile_Y), path("stats/*"), path("residuals/*"), val(product)
 
   output:
-  tuple path("disturbance_date.tif"), val(tile_ID), val(tile_X), val(tile_Y), val(product), optional: true
+  tuple path("disturbances.tif"), val(tile_ID), val(tile_X), val(tile_Y), val(product), optional: true
 
-  publishDir "$params.publish/$params.project", 
-    saveAs: {fn -> "${tile_ID}/${product}/${file(fn).name}"},
-    mode: 'copy', overwrite: true, failOnError: true
+  //publishDir "$params.publish/$params.project", 
+  //  saveAs: {fn -> "${tile_ID}/${product}/${file(fn).name}"},
+  //  mode: 'copy', overwrite: true, failOnError: true
   
   """
   disturbance_detection \
     -s "stats" \
     -r "residuals" \
-    -o "disturbance_date.tif" \
+    -o "disturbances.tif" \
+    -c "${params.disturbances.counterbreak}" \
     -d "${params.disturbances.thr_std}" \
     -m "${params.disturbances.thr_min}" \
-    -e "${params.disturbances.thr_direction}"
+    -e "${params.disturbances.thr_direction}" \
+    -n "${params.disturbances.n_confirm}"
+  """
+
+}
+
+
+process filter_small_disturbances {
+
+  label 'mmu'
+
+  input:
+  tuple path(disturbances), val(tile_ID), val(tile_X), val(tile_Y), val(product)
+
+  output:
+  tuple path("disturbance_date.tif"), val(tile_ID), val(tile_X), val(tile_Y), val(product)
+
+  publishDir "$params.publish/$params.project", 
+    saveAs: {fn -> "${tile_ID}/${product}/${file(fn).name}"},
+    mode: 'copy', overwrite: true, failOnError: true
+
+  """
+  mmu \
+    "${disturbances}" \
+    "disturbance_date.tif" \
+    "${params.disturbances.mmu}"
   """
 
 }

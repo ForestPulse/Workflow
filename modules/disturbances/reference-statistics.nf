@@ -1,4 +1,4 @@
-include { force_parameter; force_higher_level; force_higher_level } from '../common/force.nf'
+include { force_parameter; force_higher_level; force_finish } from '../common/force.nf'
 
 // compute statistics (std dev.) in reference period
 workflow stats_reference_period {
@@ -14,8 +14,10 @@ workflow stats_reference_period {
   | combine(Channel.of('stats'))
   | force_higher_level     // run higher level processing
 
+/*
   stats
   | force_finish // compute pyramids and mosaic
+*/
 
   emit:
   stats
@@ -38,7 +40,7 @@ process fill_parameter_stats {
   sed -i "/^DIR_LOWER /c\\DIR_LOWER = ${datacube}" "filled_${parfile}"
   sed -i "/^DIR_HIGHER /c\\DIR_HIGHER = ." "filled_${parfile}"
   sed -i "/^DIR_PROVENANCE /c\\DIR_PROVENANCE = ." "filled_${parfile}"
-  sed -i "/^DIR_MASK /c\\DIR_MASK = ${maskdir}" "filled_${parfile}"
+  sed -i "/^DIR_MASK /c\\DIR_MASK = ." "filled_${parfile}"
   sed -i "/^BASE_MASK /c\\BASE_MASK = \${maskfile%.*}.tif" "filled_${parfile}"
   #sed -i "/^NTHREAD_READ /c\\NTHREAD_READ = 1" "filled_${parfile}"
   sed -i "/^NTHREAD_COMPUTE /c\\NTHREAD_COMPUTE = ${params.max_cpu}" "filled_${parfile}"
