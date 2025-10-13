@@ -9,8 +9,8 @@
 */
 
 includeConfig 'params/forestMask.config'
+includeConfig 'params/disturbances.config'
 //includeConfig 'params/treeSpecies.config'
-//includeConfig 'params/disturbances.config'
 
 
 /* Custom Location File
