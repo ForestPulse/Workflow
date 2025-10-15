@@ -78,6 +78,9 @@ params {
   /* Sensors to used */
   sensors = 'SEN2A SEN2B'
 
+  /* Target Sensor (added for FORCE 3.9)*/
+  target_sensor = 'SEN2L'
+
   /* Analysis resolution */
   resolution = 10
 

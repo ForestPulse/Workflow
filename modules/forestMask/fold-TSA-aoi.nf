@@ -49,6 +49,7 @@ process fill_parameter_aoi {
   sed -i "/^Y_TILE_RANGE /c\\Y_TILE_RANGE = ${tile_Y} ${tile_Y}" "filled_${parfile}"
   sed -i "/^RESOLUTION /c\\RESOLUTION = ${params.resolution}" "filled_${parfile}"
   sed -i "/^SENSORS /c\\SENSORS = ${params.sensors}" "filled_${parfile}"
+  sed -i "/^TARGET_SENSOR /c\\TARGET_SENSOR = ${params.target_sensor}" "filled_${parfile}"
   sed -i "/^ABOVE_NOISE /c\\ABOVE_NOISE = 3" "filled_${parfile}"
   sed -i "/^BELOW_NOISE /c\\BELOW_NOISE = 0" "filled_${parfile}"
   sed -i "/^DATE_RANGE /c\\DATE_RANGE = ${params.forestMask.reference_start}-01-01 ${params.forestMask.reference_end}-12-31" "filled_${parfile}"
