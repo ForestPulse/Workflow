@@ -15,11 +15,10 @@ workflow {
     // it is not a data cube but a "federation" of tiles
     // add aoi and datacube as inputs?
     mask = treed_mask()
-    //mask.final_mask.view()
-    print "mask done!"
-
+    mask.final_mask.view()
+    
     // needs datacube, mask, aoi
-    beetle = beetle(aoi, mask)
+    //beetle = beetle(aoi, mask)
     
     // needs datacube, mask, aoi and disturbance_year from hungry-beetle
     //tree_species_unmixing(datacube, mask)
