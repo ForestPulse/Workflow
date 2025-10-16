@@ -47,6 +47,7 @@ process fill_parameter_labels {
   #sed -i "/^NTHREAD_WRITE /c\\NTHREAD_WRITE = 1" "filled_${parfile}"
   sed -i "/^X_TILE_RANGE /c\\X_TILE_RANGE = ${tile_X} ${tile_X}" "filled_${parfile}"
   sed -i "/^Y_TILE_RANGE /c\\Y_TILE_RANGE = ${tile_Y} ${tile_Y}" "filled_${parfile}"
+  sed -i "/^CHUNK_SIZE /c\\CHUNK_SIZE = ${params.chunk_size} ${params.chunk_size}" "filled_${parfile}" 
   sed -i "/^RESOLUTION /c\\RESOLUTION = ${params.resolution}" "filled_${parfile}"
   sed -i "/^SENSORS /c\\SENSORS = ${params.sensors}" "filled_${parfile}"
   sed -i "/^TARGET_SENSOR /c\\TARGET_SENSOR = ${params.target_sensor}" "filled_${parfile}"
