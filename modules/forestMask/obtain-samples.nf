@@ -49,6 +49,7 @@ process fill_parameter_stats {
   #sed -i "/^NTHREAD_WRITE /c\\NTHREAD_WRITE = 1" "filled_${parfile}"
   sed -i "/^X_TILE_RANGE /c\\X_TILE_RANGE = ${tile_X} ${tile_X}" "filled_${parfile}"
   sed -i "/^Y_TILE_RANGE /c\\Y_TILE_RANGE = ${tile_Y} ${tile_Y}" "filled_${parfile}"
+  sed -i "/^CHUNK_SIZE /c\\CHUNK_SIZE = ${params.chunk_size} ${params.chunk_size}" "filled_${parfile}"
   sed -i "/^FEATURE_NODATA /c\\FEATURE_NODATA = 0" "filled_${parfile}"
   sed -i "/^FILE_POINTS /c\\FILE_POINTS = ${params.forestMask.file_points}" "filled_${parfile}"
 
