@@ -84,7 +84,7 @@ params {
   /* Chunk size (added for FORCE 3.9)
   -- Chunks will be squared unless deemed otherwise, to divide evenly a tile
   */
-  chunk_size = 3000
+  chunk_size = '30000 3000'
 
   /* Analysis resolution */
   resolution = 10
