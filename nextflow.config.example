@@ -78,7 +78,13 @@ params {
   /* Sensors to used */
   sensors = 'SEN2A SEN2B'
 
-  /* Target Sensor (added for FORCE 3.9)*/
+  /* Target Sensor (added for FORCE 3.9)
+  -- This target sensor must have a sensor definition file in the runtime-data directory, too.
+  -- Needs to match the band subset of the SENSORS combination.
+  -- If SENSORS = SEN2A SEN2B SEN2C, the TARGET_SENSOR could be SEN2L, which has a 10-Band subset defined
+  -- more information in https://github.com/davidfrantz/force/blob/main/docs/source/history/v3/v-03-09-00.rst
+  */
+
   target_sensor = 'SEN2L'
 
   /* Chunk size (added for FORCE 3.9)
@@ -120,6 +126,7 @@ k8s {
     fsGroup: 1002,
     fsGroupChangePolicy: 'Always'
   ]
+  imagePullPolicy = 'Always'
   computeResourceType = 'Job'
   pod = [
     [volumeClaim: 'userinput-pvc',      mountPath: '/userinput/fp-nfs/'],
