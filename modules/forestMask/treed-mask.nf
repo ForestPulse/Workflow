@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
-include { force_get_tiles; force_analysis_masks } from '../common/force.nf'
+include { force_get_tiles; force_analysis_masks; force_finish } from '../common/force.nf'
 
 include { fold_TSA_labels } from './fold-TSA-labels.nf'
 include { obtain_samples } from './obtain-samples.nf'
@@ -83,7 +83,7 @@ workflow treed_mask {
     //every tile is a datacube, thus the methods can be used directly
     //what happens if we have mask, but no tile? fails on previous combine, it should
     model_directory = models.map{it[-1]}
-    prediction = fold_aoi.map{tuple(it[0], it[2])}
+    prediction = fold_aoi.map{tuple(it[0], it[2], it[3], it[4])}
         | combine(model_directory)
         | predict
 
@@ -99,6 +99,10 @@ workflow treed_mask {
     | join(ch_proc, remainder:true) // if there's no previous year processing mask
     | merge_masks
 
+    //if this works, we can remove the publishDir on merge_masks
+    final_mask.map{tuple(it[3], it[0], it[1], it[2], "processing_mask")}
+    | force_finish
+
     emit:
     final_mask
 
@@ -110,12 +114,12 @@ process merge_masks {
     label 'intensive'
 
     input:
-    tuple val(id), path(prediction), path(legal), val(prev_year)
+    tuple val(id), val(tile_X), val(tile_Y), path(prediction), path(legal), val(prev_year)
 
-    publishDir "${params.processing_mask_dir}", mode: 'copy', overwrite: true
+    //publishDir "${params.processing_mask_dir}", mode: 'copy', overwrite: true
 
     output:
-    tuple val(id), path("${id}/")
+    tuple val(id), val(tile_X), val(tile_Y), path("${id}/processing_mask*.tif")
     //tuple val(id), path("${id}/processing_mask_${params.forestMask.year}.tif")
 
     script:

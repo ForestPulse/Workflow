@@ -83,19 +83,19 @@ process predict {
     label 'intensive'
 
     input:
-    tuple path(datacube), val(tile), path(models) // models for staging purposes
+    tuple path(datacube), val(tile_ID), val(tile_X), val(tile_Y), path(models) // models for staging purposes
 
     publishDir "${params.publish}/${params.project}",
         mode: 'copy', overwrite: true, failOnError: true
 
     output:
-    tuple val(tile), path("8_prediction/${tile}/"), optional: true
+    tuple val(tile), val(tile_X), val(tile_Y), path("8_prediction/${tile_ID}/"), optional: true
 
     script:
     """
     9_DC_predict.py --working_directory . \
         --year ${params.forestMask.year} \
-        --tile ${tile} \
+        --tile ${tile_ID} \
         --name_list "${params.forestMask.name_list}" \
         --version 3
     """
