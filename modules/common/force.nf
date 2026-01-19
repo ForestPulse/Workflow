@@ -186,6 +186,85 @@ process force_mosaic {
 
 }
 
+workflow force_finish_cog {
+
+  take:
+  datacube
+  // tuple [path files, tile ID, tile ID (X), tile ID (Y), product]
+
+  main:
+  all_images = datacube
+  | transpose
+  | filter({ it[0].extension.matches("tif") })
+  | groupTuple(by: [4,5])  // [product, base name]
+
+  all_images
+  | map { group ->
+      def tiles = group.collect { it[0] }
+      tuple(tiles, group[0][4], group[0][5].simpleName)  // tiles list, product, base
+    }
+  | force_cog
+}
+
+process force_cog {
+
+  label 'force'
+  label 'multithread'
+
+  input:
+  tuple path(tiles), val(product), val(base)
+
+  output:
+  path "cog/${base}.cog.tif"
+
+  script:
+  """
+  mkdir -p cog
+  gdalbuildvrt -overwrite ${base}.vrt ${tiles.join(' ')}
+  gdal_translate \
+    ${base}.vrt \
+    cog/${base}.cog.tif \
+    -of COG \
+    -co COMPRESS=ZSTD \
+    -co PREDICTOR=2 \
+    -co INTERLEAVE=TILE \
+    -co BLOCKSIZE=256 \
+    -co BIGTIFF=YES \
+    -co OVERVIEW_RESAMPLING=AVERAGE
+
+  """
+}
+
+process force_cog {
+
+  label 'force'
+  label 'multithread'
+
+  input:
+  path "mosaic/*.vrt"
+
+  output:
+  path "cog/*.cog.tif"
+
+  publishDir "${params.publish}/${params.project}",
+      mode: 'copy',
+      overwrite: true
+
+  script:
+  """
+  gdal_translate \
+    mosaic.vrt \
+    product.cog.tif \
+    -of COG \
+    -co COMPRESS=ZSTD \
+    -co PREDICTOR=2 \
+    -co INTERLEAVE=TILE \
+    -co BLOCKSIZE=256 \
+    -co BIGTIFF=YES \
+    -co OVERVIEW_RESAMPLING=AVERAGE
+  """
+}
+
 // generate a parameter file with given module type
 process force_parameter {
 
