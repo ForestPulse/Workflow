@@ -90,7 +90,7 @@ process predict {
         mode: 'copy', overwrite: true, failOnError: true
 
     output:
-    tuple val(tile), val(tile_X), val(tile_Y), path("8_prediction/${tile_ID}/"), optional: true
+    tuple val(tile_ID), val(tile_X), val(tile_Y), path("8_prediction/${tile_ID}/"), optional: true
 
     script:
     """
