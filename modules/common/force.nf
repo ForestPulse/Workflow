@@ -235,36 +235,6 @@ process force_cog {
   """
 }
 
-process force_cog {
-
-  label 'force'
-  label 'multithread'
-
-  input:
-  path "mosaic/*.vrt"
-
-  output:
-  path "cog/*.cog.tif"
-
-  publishDir "${params.publish}/${params.project}",
-      mode: 'copy',
-      overwrite: true
-
-  script:
-  """
-  gdal_translate \
-    mosaic.vrt \
-    product.cog.tif \
-    -of COG \
-    -co COMPRESS=ZSTD \
-    -co PREDICTOR=2 \
-    -co INTERLEAVE=TILE \
-    -co BLOCKSIZE=256 \
-    -co BIGTIFF=YES \
-    -co OVERVIEW_RESAMPLING=AVERAGE
-  """
-}
-
 // generate a parameter file with given module type
 process force_parameter {
 

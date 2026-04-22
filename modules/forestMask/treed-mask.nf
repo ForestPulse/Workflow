@@ -1,7 +1,7 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
-include { force_get_tiles; force_analysis_masks; force_finish } from '../common/force.nf'
+include { force_get_tiles; force_analysis_masks; force_finish; force_finish_cog } from '../common/force.nf'
 
 include { fold_TSA_labels } from './fold-TSA-labels.nf'
 include { obtain_samples } from './obtain-samples.nf'

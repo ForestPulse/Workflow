@@ -129,3 +129,20 @@ process coloring {
         --tile ${id}
     """
 }
+
+process validation {
+    label 'tree_species'
+    
+    input:
+    path(pred_norm)
+
+    output:
+    path("5_prediction_normalized/")
+
+    script:
+    """
+    6_coloring.py --working_directory . \
+        --tree_labels ${params.treeSpecies.tree_labels}
+        --tile ${id}
+    """
+}

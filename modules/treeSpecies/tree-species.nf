@@ -1,11 +1,10 @@
 #!/usr/bin/env nextflow
 nextflow.enable.dsl=2
 
-include { force_get_tiles; force_analysis_masks } from '../common/force.nf'
-
-include { thermal_time_spline } from './thermal-time.nf'
-//TODO: Thermal Time
-include { extract_pure; make_library; train_ANN; predict_species; normalization; coloring } from './species-model.nf'
+include { spline_coefficients }                             from '../common/spline-coefficients.nf'
+include { extract_pure; make_library; make_library_tile }   from './species-model.nf'
+include { train_ANN; predict_species }                      from './species-model.nf'
+include { normalization; coloring; validation }             from './species-model.nf'
 
 /*
     Nextflow adaptation of https://github.com/ForestPulse/tree-species-unmixing
@@ -24,32 +23,29 @@ workflow tree_species_unmixing {
 
     main:
     training_points = Channel.path(params.treeSpecies.training_points)
-    datacube = thermal_time_spline(params.datacube)//Special Spline Data Cube
-    /*
-    divide into tiles
-    apply spline udf for thermal time
-    gather them up
-    */
+    datacube = spline_coefficients(params.spline.DWD_data) //Special Spline Data Cube
+    tiles = force_get_tiles(aoi, datacube_definition)
 
-    //final output is a '3_trained_model' directory storing n models
-    models = extract_pure(datacube, training_points)
-    | make_library
+    pure_elements = extract_pure(datacube, training_points)
+
+    model_full = make_library(pure_elements)
     | train_ANN
 
-    tiles = force_get_tiles(aoi, datacube_definition)
-    
-    ch_legal = Channel.fromPath("${params.forestMask.legal_mask}/*/legal_forest_mask.tif")
-    | map { path -> tuple(path.parent.name, path) }
-
-    //from here on, cube can be divided into tiles, thus use our new masks
-    samples = tiles
-    | combine(models)
+    //tentative approach
+    model_per_tile = pure_elements
     | combine(datacube)
-    | predict_species //tuple(id, prediction)
-    | combine(forest_mask) //pre-process so you can join by ID
-    | combine(disturbance_mask) //pre-process so you can join by ID
+    | make_library_tile
+    | train_ANN
+
+    samples = tiles //or we use the datacube tiles as pairs [id, coef]
+    | combine(datacube)
+    | combine(model_per_tile)
+    | combine(model)
+    | predict_species
     | normalization
     | coloring
+
+    samples | validation
 
     emit:
     samples
